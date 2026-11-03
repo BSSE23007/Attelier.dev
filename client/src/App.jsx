@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import {
   BrowserRouter,
   Routes,
@@ -9,19 +9,26 @@ import {
 } from "react-router-dom";
 
 import Contact from "./Contact";
+import Navbar from "./Navbar";
 import Footer from "./Footer";
 import BackToTop from "./BackToTop";
 import RecentProjects from "./RecentProjects";
+import {
+  AdminGuard,
+  AdminInquiryDetailsPage,
+  AdminInquiryListPage,
+  AdminLayout,
+  AdminLoginPage,
+  AdminOverviewPage,
+  AdminSecurityPage,
+} from "./admin/AdminPages";
 
 import {
   ArrowRight,
-  Menu,
-  X,
   Code2,
   Cloud,
   Palette,
   FileText,
-  Layers3,
   CheckCircle2,
 } from "lucide-react";
 
@@ -82,8 +89,9 @@ function HashScroll() {
       const section = document.getElementById(sectionId);
 
       if (section) {
+        const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
         section.scrollIntoView({
-          behavior: "smooth",
+          behavior: reduceMotion ? "auto" : "smooth",
           block: "start",
         });
       }
@@ -95,63 +103,32 @@ function HashScroll() {
   return null;
 }
 
-// Reusable homepage navigation
-function Navbar() {
-  const [menuOpen, setMenuOpen] = useState(false);
-
-  const closeMenu = () => setMenuOpen(false);
-
-  return (
-    <header className="navbar">
-      <Link className="brand" to="/" onClick={closeMenu}>
-      <img
-        className="brand-logo"
-        src="/images/logo-icon.png"
-        alt="Attelier.dev logo"
-      />
-      </Link>
-
-      <button
-        className="mobile-menu-button"
-        type="button"
-        aria-label={menuOpen ? "Close menu" : "Open menu"}
-        aria-expanded={menuOpen}
-        onClick={() => setMenuOpen((open) => !open)}
-      >
-        {menuOpen ? <X size={24} /> : <Menu size={24} />}
-      </button>
-
-      <nav className={`nav-links ${menuOpen ? "nav-open" : ""}`}>
-        <Link to="/" onClick={closeMenu}>
-          Home
-        </Link>
-
-        <Link to="/#services" onClick={closeMenu}>
-          Services
-        </Link>
-
-        <Link to="/#work" onClick={closeMenu}>
-          Our Work
-        </Link>
-
-        <Link to="/#process" onClick={closeMenu}>
-          Our Process
-        </Link>
-
-        <Link
-          className="nav-cta"
-          to="/contact"
-          onClick={closeMenu}
-        >
-          Let's Talk <ArrowRight size={16} />
-        </Link>
-      </nav>
-    </header>
-  );
-}
-
 // Homepage
 function Home() {
+  useEffect(() => {
+    const elements = document.querySelectorAll(
+      ".section-heading, .service-card, .projects-heading, .project-card, .projects-bottom-cta, .technology-section > *, .contact-content > *"
+    );
+    elements.forEach((element) => element.setAttribute("data-reveal", ""));
+
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches || !("IntersectionObserver" in window)) {
+      elements.forEach((element) => element.classList.add("is-visible"));
+      return undefined;
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add("is-visible");
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.12, rootMargin: "0px 0px -40px 0px" });
+
+    elements.forEach((element) => observer.observe(element));
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <div className="site-wrapper">
       <Navbar />
@@ -453,6 +430,15 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/contact" element={<Contact />} />
+        <Route path="/admin/login" element={<AdminLoginPage />} />
+        <Route path="/admin" element={<AdminGuard />}>
+          <Route element={<AdminLayout />}>
+            <Route index element={<AdminOverviewPage />} />
+            <Route path="inquiries" element={<AdminInquiryListPage />} />
+            <Route path="inquiries/:id" element={<AdminInquiryDetailsPage />} />
+          <Route path="security" element={<AdminSecurityPage />} />
+          </Route>
+        </Route>
         <Route path="*" element={<Home />} />
       </Routes>
     </BrowserRouter>

@@ -17,8 +17,8 @@ const projects = [
     description:
       "A real estate platform concept featuring property listings and a modern browsing experience.",
     technologies: ["React", "Node.js", "MongoDB"],
-    video: "/videos/estatecore-demo.mp4",
-    poster: "/images/estatecore-preview.jpg",
+    video: "",
+    poster: "",
     liveUrl: "",
     caseStudyUrl: "",
   },
@@ -30,8 +30,8 @@ const projects = [
     description:
       "A walkthrough of cloud architecture, deployment workflows and infrastructure decisions.",
     technologies: ["AWS", "Docker", "CI/CD"],
-    video: "/videos/cloud-demo.mp4",
-    poster: "/images/cloud-preview.jpg",
+    video: "",
+    poster: "",
     liveUrl: "",
     caseStudyUrl: "",
   },
@@ -43,8 +43,8 @@ const projects = [
     description:
       "A product walkthrough highlighting responsive layouts, useful features and application flow.",
     technologies: ["React", "Express", "API"],
-    video: "/videos/webapp-demo.mp4",
-    poster: "/images/webapp-preview.jpg",
+    video: "",
+    poster: "",
     liveUrl: "",
     caseStudyUrl: "",
   },

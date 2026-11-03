@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
+import Navbar from "./Navbar";
 import { ArrowLeft } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   ArrowRight,
   Mail,
@@ -12,14 +13,11 @@ import {
   FileText,
 } from "lucide-react";
 import "./App.css";
+import Toast from "./Toast";
+import { resolveApiBaseUrl, submitInquiry } from "./contactApi";
+import { contactServices, inquiryFormSchema } from "./contactValidation";
 
-const services = [
-  "Web Development",
-  "Cloud Engineering",
-  "UI/UX & Graphic Design",
-  "Technical Writing",
-  "Other",
-];
+const services = contactServices;
 
 export default function Contact() {
   const [form, setForm] = useState({
@@ -29,48 +27,63 @@ export default function Contact() {
     message: "",
   });
   const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState({
-    type: "",
-    message: "",
-  });
+  const [errors, setErrors] = useState({});
+  const [toast, setToast] = useState(null);
+  const submittingRef = useRef(false);
+
+  const dismissToast = useCallback(() => setToast(null), []);
 
   function handleChange(event) {
     const { name, value } = event.target;
     setForm((previous) => ({ ...previous, [name]: value }));
+    setErrors((previous) => {
+      if (!previous[name]) return previous;
+      const next = { ...previous };
+      delete next[name];
+      return next;
+    });
+  }
+
+  function handleBlur(event) {
+    const { name, value } = event.target;
+    const result = inquiryFormSchema.shape[name]?.safeParse(value);
+    setErrors((previous) => {
+      if (result?.success) {
+        if (!previous[name]) return previous;
+        const next = { ...previous };
+        delete next[name];
+        return next;
+      }
+      return { ...previous, [name]: result?.error.issues[0]?.message };
+    });
   }
 
   async function handleSubmit(event) {
     event.preventDefault();
 
+    if (submittingRef.current) return;
+
+    const validation = inquiryFormSchema.safeParse(form);
+    if (!validation.success) {
+      setErrors(Object.fromEntries(validation.error.issues.map((issue) => [issue.path[0], issue.message])));
+      setToast({ type: "error", message: "Please correct the highlighted fields and try again." });
+      window.setTimeout(() => {
+        document.querySelector(".contact-form [aria-invalid='true']")?.focus();
+      }, 0);
+      return;
+    }
+
+    submittingRef.current = true;
     setLoading(true);
-    setStatus({ type: "", message: "" });
+    setErrors({});
 
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api/inquiries`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            name: form.name,
-            email: form.email,
-            service: form.service,
-            message: form.message,
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.message || "Unable to submit your inquiry."
-        );
+      const apiBaseUrl = resolveApiBaseUrl(import.meta.env.VITE_API_URL, import.meta.env.DEV);
+      if (!apiBaseUrl) {
+        throw new Error("Online inquiry submission is unavailable right now. Please use the email link instead.");
       }
-
-      setStatus({
+      await submitInquiry(validation.data, { baseUrl: apiBaseUrl });
+      setToast({
         type: "success",
         message: "Thanks! Your project inquiry has been received.",
       });
@@ -82,20 +95,17 @@ export default function Contact() {
         message: "",
       });
     } catch (error) {
-      setStatus({
-        type: "error",
-        message:
-          error.message === "Failed to fetch"
-            ? "Unable to reach the server. Please try again."
-            : error.message || "Something went wrong. Please try again.",
-      });
+      setToast({ type: "error", message: error.message });
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   }
 
   return (
-    <main className="contact-page">
+    <>
+      <Navbar />
+      <main className="contact-page">
       <div className="contact-back-row">
         <Link to="/" className="contact-back-button">
           <ArrowLeft size={18} />
@@ -128,14 +138,16 @@ export default function Contact() {
             to hear about your project.
           </p>
 
-          <a
-            className="contact-email"
-            href="mailto:attelier.dev@gmail.com"
-          >
-            <Mail size={19} />
-            attelier.dev@gmail.com
-            <ArrowRight size={17} />
-          </a>
+          <div className="contact-email-group">
+            <a className="contact-email" href="mailto:attelier.dev@gmail.com">
+              <Mail size={19} />
+              attelier.dev@gmail.com
+              <ArrowRight size={17} />
+            </a>
+            <a className="gmail-compose" href="https://mail.google.com/mail/?view=cm&fs=1&to=attelier.dev%40gmail.com" target="_blank" rel="noreferrer">
+              Open Gmail compose
+            </a>
+          </div>
 
           <div className="contact-detail">
             <Clock size={19} />
@@ -154,30 +166,27 @@ export default function Contact() {
           </div>
         </div>
 
-        <form className="contact-form" onSubmit={handleSubmit}>
+        <form className="contact-form" onSubmit={handleSubmit} noValidate aria-busy={loading}>
           <h2>Tell us about your project</h2>
           <p>Fill in the details below to get started.</p>
 
-          {status.message && (
-            <p
-              role="status"
-              aria-live="polite"
-              className={`contact-status ${status.type}`}
-            >
-              {status.message}
-            </p>
-          )}
+          <Toast message={toast?.message} type={toast?.type} onDismiss={dismissToast} />
 
           <label htmlFor="contact-name">Your name</label>
           <input
             id="contact-name"
             name="name"
             value={form.name}
+            disabled={loading}
             onChange={handleChange}
+            onBlur={handleBlur}
             placeholder="Enter your name"
             autoComplete="name"
             required
+            aria-invalid={Boolean(errors.name)}
+            aria-describedby={errors.name ? "contact-name-error" : undefined}
           />
+          {errors.name && <span className="form-field-error" id="contact-name-error">{errors.name}</span>}
 
           <label htmlFor="contact-email">Email address</label>
           <input
@@ -185,19 +194,28 @@ export default function Contact() {
             name="email"
             type="email"
             value={form.email}
+            disabled={loading}
             onChange={handleChange}
+            onBlur={handleBlur}
             placeholder="you@example.com"
             autoComplete="email"
             required
+            aria-invalid={Boolean(errors.email)}
+            aria-describedby={errors.email ? "contact-email-error" : undefined}
           />
+          {errors.email && <span className="form-field-error" id="contact-email-error">{errors.email}</span>}
 
           <label htmlFor="contact-service">What do you need?</label>
           <select
             id="contact-service"
             name="service"
             value={form.service}
+            disabled={loading}
             onChange={handleChange}
+            onBlur={handleBlur}
             required
+            aria-invalid={Boolean(errors.service)}
+            aria-describedby={errors.service ? "contact-service-error" : undefined}
           >
             <option value="">Choose a service</option>
             {services.map((service) => (
@@ -206,17 +224,23 @@ export default function Contact() {
               </option>
             ))}
           </select>
+          {errors.service && <span className="form-field-error" id="contact-service-error">{errors.service}</span>}
 
           <label htmlFor="contact-message">Project details</label>
           <textarea
             id="contact-message"
             name="message"
             value={form.message}
+            disabled={loading}
             onChange={handleChange}
+            onBlur={handleBlur}
             placeholder="Tell us about your idea, goals and timeline..."
             rows={5}
             required
+            aria-invalid={Boolean(errors.message)}
+            aria-describedby={errors.message ? "contact-message-error" : undefined}
           />
+          {errors.message && <span className="form-field-error" id="contact-message-error">{errors.message}</span>}
 
           <button
             className="contact-submit"
@@ -232,6 +256,7 @@ export default function Contact() {
           </small>
         </form>
       </section>
-    </main>
+      </main>
+    </>
   );
 }
