@@ -92,6 +92,7 @@ export function AdminGuard() {
   const [admin, setAdmin] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [sessionExpired, setSessionExpired] = useState(false);
   const location = useLocation();
   const expiryTimer = useRef(null);
 
@@ -120,6 +121,7 @@ export function AdminGuard() {
       setAdmin(null);
       setLoading(false);
       setError("");
+      setSessionExpired(true);
     };
     window.addEventListener("admin-session-expired", expire);
     const timer = window.setTimeout(loadSession, 0);
@@ -130,9 +132,12 @@ export function AdminGuard() {
     };
   }, [loadSession]);
 
-  if (loading) return <main className="admin-gate"><div className="admin-spinner" aria-label="Checking admin session" /></main>;
+  if (loading) return <main className="admin-gate" aria-busy="true"><span className="admin-sr-only" role="status" aria-live="polite">Checking administrator session</span><div className="admin-spinner" aria-hidden="true" /></main>;
   if (error) return <main className="admin-gate"><div className="admin-error-card"><h1>Admin service unavailable</h1><p>{error}</p><button className="admin-button" onClick={loadSession} type="button"><RefreshCw size={16} /> Try again</button></div></main>;
-  if (!admin) return <Navigate to="/admin/login" replace state={{ from: location.pathname }} />;
+  if (!admin) return <Navigate to="/admin/login" replace state={{
+    from: location.pathname,
+    ...(sessionExpired ? { message: "Your session has expired. Please sign in again." } : {}),
+  }} />;
   return <Outlet context={admin} />;
 }
 
@@ -185,6 +190,7 @@ export function AdminLoginPage() {
           <button className="admin-button admin-button-primary" type="submit" disabled={busy}>
             {busy ? "Signing in…" : "Sign in"} {!busy && <ArrowRight size={17} />}
           </button>
+          {busy && <span className="admin-sr-only" role="status" aria-live="polite">Signing in</span>}
         </form>
         <Link className="admin-back-link" to="/"><ArrowLeft size={15} /> Back to website</Link>
       </section>
@@ -334,6 +340,7 @@ export function AdminSecurityPage() {
           <button className="admin-button admin-button-primary" type="submit" disabled={busy}>
             {busy ? "Updating password…" : "Change password"} {!busy && <ArrowRight size={17} />}
           </button>
+          {busy && <span className="admin-sr-only" role="status" aria-live="polite">Updating password</span>}
         </form>
       </section>
     </>
@@ -374,7 +381,7 @@ function InquiryTable({ inquiries, emptyMessage = "No inquiries match these filt
     </div>
     <div className="admin-inquiry-cards">
       {inquiries.map((inquiry) => (
-        <Link className="admin-inquiry-card" key={inquiry.id} to={`/admin/inquiries/${inquiry.id}`} aria-label={`Open inquiry from ${inquiry.name}`}>
+        <Link className="admin-inquiry-card" key={inquiry.id} to={`/admin/inquiries/${inquiry.id}`} aria-label={`Open inquiry from ${inquiry.name}. ${statusLabel(inquiry.status)} status. ${inquiry.service}. Received ${formatDate(inquiry.createdAt)}. ${inquiry.firstRespondedAt ? "First response recorded" : "Awaiting first response"}.`}>
           <span className="admin-inquiry-card-heading"><strong>{inquiry.name}</strong><StatusBadge status={inquiry.status} /></span>
           <span className="admin-inquiry-card-email">{inquiry.email}</span>
           <span className="admin-inquiry-card-signals"><PriorityBadge priority={inquiry.priority} /><ResponseIndicator value={inquiry.firstRespondedAt} /></span>
@@ -388,8 +395,13 @@ function InquiryTable({ inquiries, emptyMessage = "No inquiries match these filt
   );
 }
 
-function LoadingRows() {
-  return <div className="admin-loading-rows" aria-label="Loading inquiries"><span /><span /><span /></div>;
+function LoadingRows({ label = "Loading inquiries" }) {
+  return (
+    <div className="admin-loading-rows" role="status" aria-live="polite" aria-busy="true">
+      <span className="admin-sr-only">{label}</span>
+      <span aria-hidden="true" /><span aria-hidden="true" /><span aria-hidden="true" />
+    </div>
+  );
 }
 
 export function AdminOverviewPage() {
@@ -419,12 +431,12 @@ export function AdminOverviewPage() {
     <>
       <AdminPageHeading eyebrow="OVERVIEW" title="Dashboard" description="A quick view of your recent project inquiries." action={<button className="admin-button admin-button-quiet" onClick={load} type="button"><RefreshCw size={16} /> Refresh</button>} />
       {error && <div className="admin-error-banner" role="alert">{error}</div>}
-      <section className="admin-stat-grid" aria-label="Inquiry totals">
+      <section className="admin-stat-grid" aria-label="Inquiry totals" aria-busy={loading}>
         {[["Total inquiries", overview?.counts.total], ["New", overview?.counts.new], ["In progress", overview?.counts.inProgress], ["Completed", overview?.counts.completed]].map(([label, value]) => (
           <article className="admin-stat-card" key={label}><span>{label}</span>{loading ? <div className="admin-skeleton" /> : <strong>{value ?? 0}</strong>}</article>
         ))}
       </section>
-      <section className="admin-follow-up-grid" aria-label="Scheduled follow-ups">
+      <section className="admin-follow-up-grid" aria-label="Scheduled follow-ups" aria-busy={loading}>
         {[
           ["Due today", "dueToday", "due-today"],
           ["Overdue", "overdue", "overdue"],
@@ -435,7 +447,7 @@ export function AdminOverviewPage() {
           </Link>
         ))}
       </section>
-      <section className="admin-lead-tracking-grid" aria-label="Lead priority and first response">
+      <section className="admin-lead-tracking-grid" aria-label="Lead priority and first response" aria-busy={loading}>
         {[
           ["High priority", "highPriority", "priority=high", "admin-lead-card-high"],
           ["Awaiting first response", "awaitingFirstResponse", "response=awaiting", "admin-lead-card-awaiting"],
@@ -446,14 +458,14 @@ export function AdminOverviewPage() {
           </Link>
         ))}
       </section>
-      <div className="admin-overview-grid">
+      <div className="admin-overview-grid" aria-busy={loading}>
         <section className="admin-panel">
           <div className="admin-panel-heading"><div><h2>Recent inquiries</h2><p>Latest submissions from your website.</p></div><Link to="/admin/inquiries">View all <ArrowRight size={15} /></Link></div>
-          {loading ? <LoadingRows /> : <InquiryTable inquiries={overview?.recent || []} emptyMessage="New inquiries will appear here." />}
+          {loading ? <LoadingRows label="Loading recent inquiries" /> : <InquiryTable inquiries={overview?.recent || []} emptyMessage="New inquiries will appear here." />}
         </section>
         <section className="admin-panel admin-activity-panel">
           <div className="admin-panel-heading"><div><h2>Recent activity</h2><p>Recent status updates and notes.</p></div></div>
-          {loading ? <LoadingRows /> : overview?.activity?.length ? (
+          {loading ? <LoadingRows label="Loading recent activity" /> : overview?.activity?.length ? (
             <ul className="admin-activity-list">
               {overview.activity.map((item) => (
                 <li key={item.id}>
@@ -527,7 +539,7 @@ export function AdminInquiryListPage() {
   return (
     <>
       <AdminPageHeading eyebrow="CUSTOMER WORK" title="Inquiries" description="Search, filter, and review submitted project inquiries." />
-      <section className="admin-panel admin-inquiry-panel">
+      <section className="admin-panel admin-inquiry-panel" aria-busy={loading}>
         <div className="admin-filter-grid">
           <label className="admin-search-field">Search inquiries<input type="search" value={search} onChange={changeFilter(setSearch)} placeholder="Name, email, or project details" /></label>
           <label>Status<select value={status} onChange={changeFilter(setStatus)}><option value="">All statuses</option>{STATUSES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
@@ -539,7 +551,7 @@ export function AdminInquiryListPage() {
           <label>To date<input type="date" min={fromDate || undefined} value={toDate} onChange={changeFilter(setToDate)} /></label>
         </div>
         {error && <div className="admin-error-banner" role="alert">{error} <button type="button" onClick={() => setRefreshKey((current) => current + 1)}>Retry</button></div>}
-        {loading ? <LoadingRows /> : <InquiryTable inquiries={result?.data || []} />}
+        {loading ? <LoadingRows label="Loading inquiries" /> : <InquiryTable inquiries={result?.data || []} />}
         <div className="admin-pagination">
           <span>{pagination?.total ?? 0} inquiries</span>
           <div><span>Page {page} of {Math.max(1, pagination?.totalPages || 0)}</span><button type="button" className="admin-icon-button" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page <= 1 || loading} aria-label="Previous page"><ChevronLeft size={19} /></button><button type="button" className="admin-icon-button" onClick={() => setPage((current) => current + 1)} disabled={!pagination || page >= pagination.totalPages || loading} aria-label="Next page"><ChevronRight size={19} /></button></div>
@@ -664,7 +676,7 @@ export function AdminInquiryDetailsPage() {
   return (
     <>
       <div className="admin-detail-back"><Link to="/admin/inquiries"><ArrowLeft size={16} /> Back to inquiries</Link></div>
-      {loading && <LoadingRows />}
+      {loading && <LoadingRows label="Loading inquiry details" />}
       {error && <div className="admin-error-banner" role="alert">{error}<button type="button" onClick={load}>Retry</button></div>}
       {!loading && inquiry && <>
         <AdminPageHeading eyebrow="INQUIRY DETAILS" title={inquiry.name} description={`Received ${formatDate(inquiry.createdAt, { dateStyle: "long", timeStyle: "short" })}`} action={<StatusBadge status={inquiry.status} />} />

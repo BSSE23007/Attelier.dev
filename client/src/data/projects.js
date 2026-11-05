@@ -35,7 +35,7 @@ export const projects = [
           type: "architecture",
           title: "Proposed AWS architecture (deployment unverified)",
           description: "The documented scope includes a cloud-based platform, listing management, and AWS infrastructure. The supplied materials do not establish which individual infrastructure components were implemented versus proposed.",
-          imageAlt: "EstateCore AWS architecture diagram",
+          imageAlt: "Proposed EstateCore AWS architecture diagram; deployment is unverified",
           layout: "grid",
           nodes: [
             { title: "Customer and agent workflows", description: "The project identifies both customer and agent experiences." },
@@ -71,6 +71,7 @@ export const projects = [
         { label: "Team", value: "Ali Sher Afzal and Ali Hasnain" },
         { label: "Repository", value: "Source available on GitHub" },
       ],
+      creators: ["Ali Sher Afzal", "Ali Hasnain"],
       highlights: [],
       overview: "The project focuses on patient administration for two roles: administrators and doctors. It combines authentication, role-based access, patient record operations, and server-side pagination in a responsive Bootstrap interface.",
       sections: [
@@ -139,6 +140,7 @@ export const projects = [
         { label: "Institution", value: "Information Technology University (ITU)" },
         { label: "Advisor", value: "Dr. Zunnorain Hussain" },
       ],
+      creators: ["Ali Sher Afzal", "Suhaib Kashif"],
       highlights: [
         { value: "~1.2 sec", label: "Project-reported average remediation time", note: "Reported during project simulation; not a guaranteed benchmark." },
       ],
@@ -226,8 +228,9 @@ export const projects = [
         { label: "Client branding", value: "GHANI GFX" },
         { label: "Duration", value: "Approximately 20 seconds" },
       ],
+      creators: ["Ali Sher Afzal"],
       highlights: [],
-      overview: "A compact promotional motion piece that brings client branding and an investment-themed message together through animated typography, imagery, icons, transitions, and compositing.",
+      overview: "A compact promotional motion piece for GHANI GFX as the client brand, bringing an investment-themed message together through animated typography, imagery, icons, transitions, and compositing.",
       sections: [
         {
           type: "workflow",

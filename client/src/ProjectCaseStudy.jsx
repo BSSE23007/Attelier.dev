@@ -43,7 +43,7 @@ function CaseStudySection({ project, section, index }) {
         <div className="case-study-section-heading">
           <span className="case-study-index">{String(index + 1).padStart(2, "0")}</span>
           <div>
-            <h3 id={`${sectionId}-title`}>{section.title}</h3>
+            <h2 id={`${sectionId}-title`}>{section.title}</h2>
             {section.description && <p>{section.description}</p>}
           </div>
         </div>
@@ -51,7 +51,7 @@ function CaseStudySection({ project, section, index }) {
           {(section.steps || []).map((step, stepIndex) => (
             <li key={`${step.title}-${stepIndex}`}>
               <span className="case-study-step-number">{String(stepIndex + 1).padStart(2, "0")}</span>
-              <div><h4>{step.title}</h4><p>{step.description}</p></div>
+              <div><h3>{step.title}</h3><p>{step.description}</p></div>
             </li>
           ))}
         </ol>
@@ -68,7 +68,7 @@ function CaseStudySection({ project, section, index }) {
         <div className="case-study-section-heading">
           <span className="case-study-index">{String(index + 1).padStart(2, "0")}</span>
           <div>
-            <h3 id={`${sectionId}-title`}>{section.title}</h3>
+            <h2 id={`${sectionId}-title`}>{section.title}</h2>
             {section.description && <p>{section.description}</p>}
           </div>
         </div>
@@ -77,7 +77,7 @@ function CaseStudySection({ project, section, index }) {
             <div className="case-study-architecture-node" key={`${node.title}-${nodeIndex}`}>
               {section.layout === "pipeline" && <span className="case-study-node-number">{String(nodeIndex + 1).padStart(2, "0")}</span>}
               {section.layout === "pipeline" && nodeIndex < section.nodes.length - 1 && <ArrowRight className="case-study-node-arrow" size={17} aria-hidden="true" />}
-              <h4>{node.title}</h4>
+              <h3>{node.title}</h3>
               <p>{node.description}</p>
             </div>
           ))}
@@ -99,7 +99,7 @@ function CaseStudySection({ project, section, index }) {
         <div className="case-study-section-heading">
           <span className="case-study-index">{String(index + 1).padStart(2, "0")}</span>
           <div>
-            <h3 id={`${sectionId}-title`}>{section.title}</h3>
+            <h2 id={`${sectionId}-title`}>{section.title}</h2>
             {section.description && <p>{section.description}</p>}
           </div>
         </div>
@@ -109,7 +109,7 @@ function CaseStudySection({ project, section, index }) {
             return (
               <article className="case-study-feature" key={item.title}>
                 <span className="case-study-feature-icon"><Icon size={19} aria-hidden="true" /></span>
-                <h4>{item.title}</h4>
+                <h3>{item.title}</h3>
                 <p>{item.description}</p>
               </article>
             );
@@ -122,8 +122,8 @@ function CaseStudySection({ project, section, index }) {
   if (section.type === "callout") {
     return (
       <section className={`case-study-callout ${section.tone || ""}`} aria-labelledby={`${sectionId}-title`}>
-        <span className="section-label">{section.title}</span>
-        <strong id={`${sectionId}-title`}>{section.value}</strong>
+        <h2 className="section-label" id={`${sectionId}-title`}>{section.title}</h2>
+        <strong>{section.value}</strong>
         <p>{section.content}</p>
       </section>
     );
@@ -135,7 +135,7 @@ function CaseStudySection({ project, section, index }) {
         <div className="case-study-section-heading">
           <span className="case-study-index">{String(index + 1).padStart(2, "0")}</span>
           <div>
-            <h3 id={`${sectionId}-title`}>{section.title}</h3>
+            <h2 id={`${sectionId}-title`}>{section.title}</h2>
             {section.description && <p>{section.description}</p>}
           </div>
         </div>
@@ -183,7 +183,7 @@ function ProjectCaseStudy({ project }) {
       {caseStudy.overview && (
         <section className="case-study-overview" aria-labelledby={`${project.id}-overview-title`}>
           <span className="section-label">PROJECT OVERVIEW</span>
-          <h3 id={`${project.id}-overview-title`}>The brief and approach</h3>
+          <h2 id={`${project.id}-overview-title`}>The brief and approach</h2>
           <p>{caseStudy.overview}</p>
         </section>
       )}
@@ -194,7 +194,7 @@ function ProjectCaseStudy({ project }) {
 
       {project.technologies?.length > 0 && (
         <section className="project-detail-technologies">
-          <h3>Technology stack</h3>
+          <h2>Technology stack</h2>
           <div className="case-study-tech-list">
             {project.technologies.map((technology) => <span key={technology}>{technology}</span>)}
           </div>
@@ -202,8 +202,8 @@ function ProjectCaseStudy({ project }) {
       )}
 
       {resources.length > 0 && (
-        <section className="project-detail-resources" aria-label="Project resources">
-          <h3>Demonstration and project resources</h3>
+        <section className="project-detail-resources" aria-labelledby={`${project.id}-resources-title`}>
+          <h2 id={`${project.id}-resources-title`}>Demonstration and project resources</h2>
           <ul>
             {resources.map((resource) => (
               <li key={resource.href}>

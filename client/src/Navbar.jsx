@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Menu, X } from "lucide-react";
 
@@ -6,8 +6,12 @@ import { ArrowRight, Menu, X } from "lucide-react";
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const menuButtonRef = useRef(null);
 
-  const closeMenu = () => setMenuOpen(false);
+  const closeMenu = () => {
+    setMenuOpen(false);
+    menuButtonRef.current?.focus();
+  };
 
   useEffect(() => {
     const updateScrolled = () => setScrolled(window.scrollY > 12);
@@ -19,7 +23,7 @@ export default function Navbar() {
   useEffect(() => {
     if (!menuOpen) return undefined;
     const closeOnEscape = (event) => {
-      if (event.key === "Escape") closeMenu();
+      if (event.key === "Escape" && menuOpen) closeMenu();
     };
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
@@ -36,6 +40,7 @@ export default function Navbar() {
       </Link>
 
       <button
+        ref={menuButtonRef}
         className="mobile-menu-button"
         type="button"
         aria-label={menuOpen ? "Close menu" : "Open menu"}

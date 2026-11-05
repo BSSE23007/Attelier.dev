@@ -1,5 +1,5 @@
 
-import { useEffect } from "react";
+import { Component, lazy, Suspense, useEffect } from "react";
 import {
   BrowserRouter,
   Routes,
@@ -15,15 +15,17 @@ import BackToTop from "./BackToTop";
 import RecentProjects from "./RecentProjects";
 import ProjectDetailPage from "./ProjectDetailPage";
 import TawkChat from "./TawkChat";
-import {
-  AdminGuard,
-  AdminInquiryDetailsPage,
-  AdminInquiryListPage,
-  AdminLayout,
-  AdminLoginPage,
-  AdminOverviewPage,
-  AdminSecurityPage,
-} from "./admin/AdminPages";
+const loadAdminPage = (pageName) => lazy(() =>
+  import("./admin/AdminPages.jsx").then((pages) => ({ default: pages[pageName] }))
+);
+
+const AdminGuard = loadAdminPage("AdminGuard");
+const AdminInquiryDetailsPage = loadAdminPage("AdminInquiryDetailsPage");
+const AdminInquiryListPage = loadAdminPage("AdminInquiryListPage");
+const AdminLayout = loadAdminPage("AdminLayout");
+const AdminLoginPage = loadAdminPage("AdminLoginPage");
+const AdminOverviewPage = loadAdminPage("AdminOverviewPage");
+const AdminSecurityPage = loadAdminPage("AdminSecurityPage");
 
 import {
   ArrowRight,
@@ -35,11 +37,14 @@ import {
 } from "lucide-react";
 
 import "./App.css";
+import RouteMetadata from "./RouteMetadata";
+import StructuredData from "./StructuredData";
 
 // Services displayed on the homepage
 const services = [
   {
     number: "01",
+    id: "service-web-development",
     icon: Code2,
     title: "Web Development",
     description:
@@ -48,6 +53,7 @@ const services = [
   },
   {
     number: "02",
+    id: "service-cloud-devops",
     icon: Cloud,
     title: "Cloud & DevOps",
     description:
@@ -56,6 +62,7 @@ const services = [
   },
   {
     number: "03",
+    id: "service-graphic-design",
     icon: Palette,
     title: "Graphic Design",
     description:
@@ -64,6 +71,7 @@ const services = [
   },
   {
     number: "04",
+    id: "service-technical-writing",
     icon: FileText,
     title: "Technical Writing",
     description:
@@ -314,6 +322,7 @@ function Home() {
               return (
                 <article
                   className="service-card"
+                  id={service.id}
                   key={service.number}
                 >
                   <div className="service-card-top">
@@ -421,10 +430,67 @@ function Home() {
   );
 }
 
-// App routes
-export default function App() {
+function NotFoundPage() {
   return (
-    <BrowserRouter>
+    <div className="site-wrapper">
+      <Navbar />
+      <main className="project-page-main project-not-found">
+        <span className="section-label">PAGE NOT FOUND</span>
+        <h1>This page could not be found</h1>
+        <p>The address may be incorrect, or the page may have moved.</p>
+        <Link className="button button-secondary" to="/">
+          <ArrowRight size={17} /> Back to home
+        </Link>
+      </main>
+      <Footer />
+      <BackToTop />
+    </div>
+  );
+}
+
+class AdminRouteBoundary extends Component {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <main className="admin-route-state">
+          <div role="alert">
+            <h1>Admin pages could not be loaded</h1>
+            <p>Please try again. Your account and inquiry data have not been changed.</p>
+            <button className="button button-secondary" onClick={() => window.location.reload()} type="button">
+              Reload admin
+            </button>
+          </div>
+        </main>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+function AdminRouteLoading() {
+  return (
+    <main className="admin-route-state" aria-busy="true">
+      <div role="status" aria-live="polite">
+        <span className="admin-route-spinner" aria-hidden="true" />
+        <p>Loading admin...</p>
+      </div>
+    </main>
+  );
+}
+
+// Kept separate so the same routes can be rendered during the Vite build.
+export function AppRoutes() {
+  return (
+    <>
+      <RouteMetadata />
+      <StructuredData />
       <HashScroll />
       <TawkChat />
 
@@ -432,8 +498,26 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/contact" element={<Contact />} />
         <Route path="/projects/:slug" element={<ProjectDetailPage />} />
-        <Route path="/admin/login" element={<AdminLoginPage />} />
-        <Route path="/admin" element={<AdminGuard />}>
+        <Route
+          path="/admin/login"
+          element={
+            <AdminRouteBoundary>
+              <Suspense fallback={<AdminRouteLoading />}>
+                <AdminLoginPage />
+              </Suspense>
+            </AdminRouteBoundary>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <AdminRouteBoundary>
+              <Suspense fallback={<AdminRouteLoading />}>
+                <AdminGuard />
+              </Suspense>
+            </AdminRouteBoundary>
+          }
+        >
           <Route element={<AdminLayout />}>
             <Route index element={<AdminOverviewPage />} />
             <Route path="inquiries" element={<AdminInquiryListPage />} />
@@ -441,8 +525,16 @@ export default function App() {
             <Route path="security" element={<AdminSecurityPage />} />
           </Route>
         </Route>
-        <Route path="*" element={<Home />} />
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AppRoutes />
     </BrowserRouter>
   );
 }

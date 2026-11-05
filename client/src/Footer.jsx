@@ -54,9 +54,9 @@ export default function Footer() {
         <div className="footer-about">
           <Link className="brand footer-brand" to="/">
             <img
-                className="brand-logo"
-                src="/images/logo-icon.png"
-                alt="Attelier.dev logo"
+              className="brand-logo"
+              src="/images/logo-icon.png"
+              alt=""
             />
             <span className="brand-name">
               Attelier<span>.dev</span>
@@ -82,7 +82,7 @@ export default function Footer() {
         </div>
 
         <div className="footer-column">
-          <h3>Explore</h3>
+          <h2>Explore</h2>
           <Link to="/">Home</Link>
           <Link to="/#services">Services</Link>
           <Link to="/#work">Our Work</Link>
@@ -91,15 +91,15 @@ export default function Footer() {
         </div>
 
         <div className="footer-column">
-          <h3>Our Services</h3>
-          <Link to="/#services">Web Development</Link>
-          <Link to="/#services">Cloud & DevOps</Link>
-          <Link to="/#services">Graphic Design</Link>
-          <Link to="/#services">Technical Writing</Link>
+          <h2>Our Services</h2>
+          <Link to="/#service-web-development">Web Development</Link>
+          <Link to="/#service-cloud-devops">Cloud & DevOps</Link>
+          <Link to="/#service-graphic-design">Graphic Design</Link>
+          <Link to="/#service-technical-writing">Technical Writing</Link>
         </div>
 
         <div className="footer-column footer-social">
-          <h3>Connect</h3>
+          <h2>Connect</h2>
           <p>Have an idea? Let's start a conversation.</p>
 
           <Link className="footer-project-link" to="/contact">

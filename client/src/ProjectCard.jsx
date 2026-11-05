@@ -3,6 +3,25 @@ import { Link } from "react-router-dom";
 import { ArrowUpRight, Code2, Cloud, Pause, Play } from "lucide-react";
 import { isLocalProjectAsset } from "./projectMedia";
 
+function releasePreview(video) {
+  if (!video) return;
+
+  const source = video.querySelector("source");
+  const hasSource = video.hasAttribute("src") || source?.hasAttribute("src");
+  video.pause();
+
+  if (!hasSource) return;
+
+  try {
+    video.currentTime = 0;
+  } catch {
+    // A preview that has not loaded metadata may not support seeking yet.
+  }
+  source?.removeAttribute("src");
+  video.removeAttribute("src");
+  video.load();
+}
+
 function ProjectCard({ project }) {
   const videoRef = useRef(null);
   const playbackRequest = useRef(0);
@@ -16,7 +35,7 @@ function ProjectCard({ project }) {
 
   useEffect(() => () => {
     playbackRequest.current += 1;
-    videoRef.current?.pause();
+    releasePreview(videoRef.current);
   }, []);
 
   async function playPreview() {
@@ -25,17 +44,24 @@ function ProjectCard({ project }) {
     const request = ++playbackRequest.current;
 
     document.querySelectorAll("video.project-preview").forEach((otherVideo) => {
-      if (otherVideo !== video) {
-        otherVideo.pause();
-        otherVideo.currentTime = 0;
-      }
+      if (otherVideo !== video) releasePreview(otherVideo);
     });
 
     try {
+      const source = video.querySelector("source");
+      if (source && !source.hasAttribute("src")) {
+        source.setAttribute("src", source.dataset.src || previewVideo);
+        video.load();
+      }
       await video.play();
-      if (playbackRequest.current === request) setIsPlayingPreview(true);
+      if (playbackRequest.current === request && source?.hasAttribute("src")) {
+        setIsPlayingPreview(true);
+      }
     } catch {
-      if (playbackRequest.current === request) setIsPlayingPreview(false);
+      if (playbackRequest.current === request) {
+        releasePreview(video);
+        setIsPlayingPreview(false);
+      }
     }
   }
 
@@ -43,8 +69,7 @@ function ProjectCard({ project }) {
     const video = videoRef.current;
     if (!video) return;
     playbackRequest.current += 1;
-    video.pause();
-    video.currentTime = 0;
+    releasePreview(video);
     setIsPlayingPreview(false);
   }
 
@@ -84,7 +109,7 @@ function ProjectCard({ project }) {
                 tabIndex={-1}
                 onPause={() => setIsPlayingPreview(false)}
               >
-                <source src={previewVideo} type="video/mp4" />
+                <source data-src={previewVideo} type="video/mp4" />
                 Your browser does not support video playback.
               </video>
             </>
