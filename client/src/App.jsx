@@ -13,6 +13,8 @@ import Navbar from "./Navbar";
 import Footer from "./Footer";
 import BackToTop from "./BackToTop";
 import RecentProjects from "./RecentProjects";
+import ProjectDetailPage from "./ProjectDetailPage";
+import TawkChat from "./TawkChat";
 import {
   AdminGuard,
   AdminInquiryDetailsPage,
@@ -347,9 +349,7 @@ function Home() {
         </section>
 
         {/* PROJECTS */}
-        <div id="work">
-          <RecentProjects />
-        </div>
+        <RecentProjects />
 
         {/* TECHNOLOGY */}
         <section
@@ -426,17 +426,19 @@ export default function App() {
   return (
     <BrowserRouter>
       <HashScroll />
+      <TawkChat />
 
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/contact" element={<Contact />} />
+        <Route path="/projects/:slug" element={<ProjectDetailPage />} />
         <Route path="/admin/login" element={<AdminLoginPage />} />
         <Route path="/admin" element={<AdminGuard />}>
           <Route element={<AdminLayout />}>
             <Route index element={<AdminOverviewPage />} />
             <Route path="inquiries" element={<AdminInquiryListPage />} />
             <Route path="inquiries/:id" element={<AdminInquiryDetailsPage />} />
-          <Route path="security" element={<AdminSecurityPage />} />
+            <Route path="security" element={<AdminSecurityPage />} />
           </Route>
         </Route>
         <Route path="*" element={<Home />} />

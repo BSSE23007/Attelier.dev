@@ -14,6 +14,11 @@ const adminSessionSchema = new mongoose.Schema(
       unique: true,
       select: false,
     },
+    credentialVersion: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
     expiresAt: {
       type: Date,
       required: true,

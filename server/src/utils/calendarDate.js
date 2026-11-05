@@ -1,0 +1,16 @@
+export function parseCalendarDate(value) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+
+  const date = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) return null;
+  return date;
+}
+
+export function getCalendarDateRange(value) {
+  const start = parseCalendarDate(value);
+  if (!start) return null;
+
+  const next = new Date(start);
+  next.setUTCDate(next.getUTCDate() + 1);
+  return { start, next };
+}

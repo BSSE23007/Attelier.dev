@@ -1,5 +1,6 @@
 import { hashSessionToken } from "../security/adminCredentials.js";
 import AdminSession from "../models/AdminSession.js";
+import { logSafeError } from "../utils/safeErrorLogger.js";
 
 export const ADMIN_SESSION_COOKIE = "attelier_admin_session";
 export const ADMIN_SESSION_DURATION_MS = 8 * 60 * 60 * 1000;
@@ -38,9 +39,11 @@ export async function requireAdmin(req, res, next) {
     const session = await AdminSession.findOne({
       tokenHash: hashSessionToken(token),
       expiresAt: { $gt: new Date() },
-    }).populate("adminId", "email role isActive");
+    }).populate("adminId", "email role isActive credentialVersion");
 
-    if (!session || !session.adminId?.isActive || session.adminId.role !== "admin") {
+    const sessionVersion = session?.credentialVersion ?? 0;
+    const adminVersion = session?.adminId?.credentialVersion ?? 0;
+    if (!session || !session.adminId?.isActive || session.adminId.role !== "admin" || sessionVersion !== adminVersion) {
       clearAdminCookie(res);
       return res.status(401).json({ success: false, message: "Authentication required." });
     }
@@ -49,11 +52,13 @@ export async function requireAdmin(req, res, next) {
       id: session.adminId._id,
       email: session.adminId.email,
       role: session.adminId.role,
+      credentialVersion: adminVersion,
     };
     req.adminSessionId = session._id;
     req.adminSessionExpiresAt = session.expiresAt;
     return next();
-  } catch {
+  } catch (error) {
+    logSafeError("Admin session lookup failed", error);
     return res.status(503).json({ success: false, message: "Admin service is temporarily unavailable." });
   }
 }

@@ -1,69 +1,23 @@
 
 import { useState } from "react";
-import {
-  ArrowUpRight,
-  Play,
-  Code2,
-  Cloud,
-  ExternalLink,
-} from "lucide-react";
-
-const projects = [
-  {
-    id: 1,
-    title: "EstateCore",
-    category: "Web Development",
-    type: "web",
-    description:
-      "A real estate platform concept featuring property listings and a modern browsing experience.",
-    technologies: ["React", "Node.js", "MongoDB"],
-    video: "",
-    poster: "",
-    liveUrl: "",
-    caseStudyUrl: "",
-  },
-  {
-    id: 2,
-    title: "Cloud Engineering Showcase",
-    category: "Cloud & DevOps",
-    type: "cloud",
-    description:
-      "A walkthrough of cloud architecture, deployment workflows and infrastructure decisions.",
-    technologies: ["AWS", "Docker", "CI/CD"],
-    video: "",
-    poster: "",
-    liveUrl: "",
-    caseStudyUrl: "",
-  },
-  {
-    id: 3,
-    title: "Web Application Showcase",
-    category: "Web Development",
-    type: "web",
-    description:
-      "A product walkthrough highlighting responsive layouts, useful features and application flow.",
-    technologies: ["React", "Express", "API"],
-    video: "",
-    poster: "",
-    liveUrl: "",
-    caseStudyUrl: "",
-  },
-];
+import { ArrowUpRight, Play } from "lucide-react";
+import { getPublishedProjects, projects } from "./data/projects";
+import ProjectCard from "./ProjectCard";
 
 const filters = [
   { label: "All projects", value: "all" },
   { label: "Web development", value: "web" },
   { label: "Cloud & DevOps", value: "cloud" },
+  { label: "Motion graphics", value: "motion" },
 ];
 
-function RecentProjects() {
+function RecentProjects({ projectList = projects }) {
   const [activeFilter, setActiveFilter] = useState("all");
 
-  const visibleProjects =
-    activeFilter === "all"
-      ? projects
-      : projects.filter((project) => project.type === activeFilter);
-
+  const publishedProjects = getPublishedProjects(projectList);
+  const visibleProjects = publishedProjects.filter(
+    (project) => activeFilter === "all" || project.filter === activeFilter,
+  );
   return (
     <section className="projects-section" id="work">
       <div className="projects-container">
@@ -106,69 +60,7 @@ function RecentProjects() {
 
         <div className="projects-grid">
           {visibleProjects.map((project) => (
-            <article className="project-card" key={project.id}>
-              <div className="project-media">
-                {project.video ? (
-                  <video
-                    controls
-                    preload="none"
-                    playsInline
-                    poster={project.poster}
-                    aria-label={`${project.title} video demonstration`}
-                  >
-                    <source src={project.video} type="video/mp4" />
-                    Your browser does not support video playback.
-                  </video>
-                ) : (
-                  <div className="project-media-placeholder">
-                    {project.type === "cloud" ? (
-                      <Cloud size={38} />
-                    ) : (
-                      <Code2 size={38} />
-                    )}
-                    <span>Project preview coming soon</span>
-                  </div>
-                )}
-                <span className="project-category">{project.category}</span>
-              </div>
-
-              <div className="project-card-body">
-                <div className="project-title-row">
-                  <h3>{project.title}</h3>
-                  <ArrowUpRight size={19} />
-                </div>
-
-                <p>{project.description}</p>
-
-                <div className="project-tech">
-                  {project.technologies.map((technology) => (
-                    <span key={technology}>{technology}</span>
-                  ))}
-                </div>
-
-                <div className="project-actions">
-                  {project.liveUrl ? (
-                    <a
-                      href={project.liveUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Live demo <ExternalLink size={15} />
-                    </a>
-                  ) : (
-                    <span className="project-link-disabled">
-                      Live demo coming soon
-                    </span>
-                  )}
-
-                  {project.caseStudyUrl && (
-                    <a href={project.caseStudyUrl}>
-                      Case study <ArrowUpRight size={15} />
-                    </a>
-                  )}
-                </div>
-              </div>
-            </article>
+            <ProjectCard project={project} key={project.id} />
           ))}
         </div>
 

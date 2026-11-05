@@ -12,8 +12,9 @@ const inquiryNoteSchema = new mongoose.Schema(
 
 const inquiryActivitySchema = new mongoose.Schema(
   {
-    type: { type: String, enum: ["status-changed", "note-added"], required: true },
+    type: { type: String, enum: ["status-changed", "note-added", "priority-changed", "first-response-recorded"], required: true },
     status: { type: String, enum: ["new", "in-progress", "completed"] },
+    priority: { type: String, enum: ["low", "normal", "high"] },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "Admin", required: true },
     createdAt: { type: Date, default: Date.now, required: true },
   },
@@ -52,6 +53,20 @@ const inquirySchema = new mongoose.Schema(
       enum: ["new", "in-progress", "completed"],
       default: "new",
     },
+    priority: {
+      type: String,
+      enum: ["low", "normal", "high"],
+      default: "normal",
+    },
+    firstRespondedAt: {
+      type: Date,
+      default: undefined,
+    },
+    // Calendar dates are represented as UTC midnight; a missing or null value means unscheduled.
+    followUpAt: {
+      type: Date,
+      default: undefined,
+    },
     notes: {
       type: [inquiryNoteSchema],
       default: [],
@@ -69,6 +84,9 @@ const inquirySchema = new mongoose.Schema(
 inquirySchema.index({ status: 1, createdAt: -1 });
 inquirySchema.index({ service: 1, createdAt: -1 });
 inquirySchema.index({ "activity.createdAt": -1 });
+inquirySchema.index({ followUpAt: 1, status: 1 });
+inquirySchema.index({ priority: 1, createdAt: -1 });
+inquirySchema.index({ firstRespondedAt: 1, status: 1 });
 
 const Inquiry = mongoose.model("Inquiry", inquirySchema);
 

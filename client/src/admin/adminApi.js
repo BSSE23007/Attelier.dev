@@ -53,9 +53,12 @@ export const adminApi = {
   logout: () => adminRequest("auth/logout", { method: "POST", body: {} }),
   changePassword: (body) => adminRequest("auth/password", { method: "POST", body }),
   session: () => adminRequest("auth/session"),
-  overview: ({ signal } = {}) => adminRequest("overview", { signal }),
+  overview: ({ signal, today } = {}) => adminRequest(`overview${today ? `?today=${encodeURIComponent(today)}` : ""}`, { signal }),
   inquiries: (params, { signal } = {}) => adminRequest(`inquiries?${params}`, { signal }),
   inquiry: (id, { signal } = {}) => adminRequest(`inquiries/${encodeURIComponent(id)}`, { signal }),
   updateStatus: (id, status) => adminRequest(`inquiries/${encodeURIComponent(id)}/status`, { method: "PATCH", body: { status } }),
+  updatePriority: (id, priority) => adminRequest(`inquiries/${encodeURIComponent(id)}/priority`, { method: "PATCH", body: { priority } }),
+  markResponded: (id) => adminRequest(`inquiries/${encodeURIComponent(id)}/first-response`, { method: "POST", body: {} }),
+  updateFollowUp: (id, followUpAt) => adminRequest(`inquiries/${encodeURIComponent(id)}/follow-up`, { method: "PATCH", body: { followUpAt } }),
   addNote: (id, body) => adminRequest(`inquiries/${encodeURIComponent(id)}/notes`, { method: "POST", body: { body } }),
 };

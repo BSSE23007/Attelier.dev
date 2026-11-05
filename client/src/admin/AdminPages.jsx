@@ -8,10 +8,12 @@ import {
   useNavigate,
   useOutletContext,
   useParams,
+  useSearchParams,
 } from "react-router-dom";
 import { ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, ClipboardList, Eye, EyeOff, KeyRound, LayoutDashboard, LogOut, Menu, RefreshCw, Shield, X } from "lucide-react";
 import Toast from "../Toast";
 import { adminApi } from "./adminApi";
+import { followUpDateInputValue, followUpDateState, formatFollowUpDate, localCalendarDate } from "./followUpDates";
 import "./Admin.css";
 
 const STATUSES = [
@@ -20,6 +22,27 @@ const STATUSES = [
   { value: "completed", label: "Completed" },
 ];
 const SERVICES = ["Web Development", "Cloud Engineering", "UI/UX & Graphic Design", "Technical Writing", "Other"];
+const PRIORITIES = [
+  { value: "low", label: "Low" },
+  { value: "normal", label: "Normal" },
+  { value: "high", label: "High" },
+];
+const FOLLOW_UP_FILTERS = [
+  { value: "", label: "All inquiries" },
+  { value: "due-today", label: "Due today" },
+  { value: "overdue", label: "Overdue" },
+  { value: "upcoming", label: "Upcoming" },
+  { value: "none", label: "No follow-up scheduled" },
+];
+const PRIORITY_FILTERS = [
+  { value: "", label: "All priorities" },
+  ...PRIORITIES,
+];
+const RESPONSE_FILTERS = [
+  { value: "", label: "All response states" },
+  { value: "awaiting", label: "Awaiting first response" },
+  { value: "responded", label: "Responded" },
+];
 
 function formatDate(value, options = {}) {
   if (!value) return "—";
@@ -32,8 +55,37 @@ function statusLabel(status) {
   return STATUSES.find((item) => item.value === status)?.label || status;
 }
 
+function priorityLabel(priority) {
+  return PRIORITIES.find((item) => item.value === priority)?.label || "Normal";
+}
+
 function StatusBadge({ status }) {
   return <span className={`admin-status admin-status-${status}`}>{statusLabel(status)}</span>;
+}
+
+function PriorityBadge({ priority = "normal" }) {
+  const value = PRIORITIES.some((item) => item.value === priority) ? priority : "normal";
+  return <span className={`admin-priority admin-priority-${value}`}>{priorityLabel(value)}</span>;
+}
+
+function ResponseIndicator({ value }) {
+  return value
+    ? <span className="admin-response-indicator admin-response-recorded">Responded</span>
+    : <span className="admin-response-indicator admin-response-awaiting">Awaiting response</span>;
+}
+
+function activityLabel(item) {
+  if (item.type === "note-added") return "Internal note added";
+  if (item.type === "first-response-recorded") return "First response recorded";
+  if (item.type === "priority-changed") return `Priority changed to ${priorityLabel(item.priority).toLowerCase()}`;
+  return `Status changed to ${statusLabel(item.status)}`;
+}
+
+function FollowUpIndicator({ value, compact = false }) {
+  if (!value) return <span className="admin-follow-up-none">{compact ? "No follow-up" : "—"}</span>;
+  const state = followUpDateState(value);
+  const label = state === "due-today" ? "Due today" : state === "overdue" ? "Overdue" : "Upcoming";
+  return <span className={`admin-follow-up-indicator admin-follow-up-${state}`}>{label} · {formatFollowUpDate(value)}</span>;
 }
 
 export function AdminGuard() {
@@ -303,14 +355,17 @@ function InquiryTable({ inquiries, emptyMessage = "No inquiries match these filt
     <>
     <div className="admin-table-wrap">
       <table className="admin-table">
-        <thead><tr><th>Customer</th><th>Service</th><th>Received</th><th>Status</th><th><span className="admin-sr-only">Open inquiry</span></th></tr></thead>
+        <thead><tr><th>Customer</th><th>Service</th><th>Received</th><th>Priority</th><th>Status</th><th>First response</th><th>Follow-up</th><th><span className="admin-sr-only">Open inquiry</span></th></tr></thead>
         <tbody>
           {inquiries.map((inquiry) => (
             <tr key={inquiry.id}>
               <td><Link className="admin-customer-link" to={`/admin/inquiries/${inquiry.id}`}>{inquiry.name}</Link><span className="admin-table-subtext">{inquiry.email}</span></td>
               <td>{inquiry.service}</td>
               <td>{formatDate(inquiry.createdAt)}</td>
+              <td><PriorityBadge priority={inquiry.priority} /></td>
               <td><StatusBadge status={inquiry.status} /></td>
+              <td><ResponseIndicator value={inquiry.firstRespondedAt} /></td>
+              <td><FollowUpIndicator value={inquiry.followUpAt} /></td>
               <td><Link className="admin-row-link" to={`/admin/inquiries/${inquiry.id}`} aria-label={`View inquiry from ${inquiry.name}`}><ArrowRight size={17} /></Link></td>
             </tr>
           ))}
@@ -322,7 +377,9 @@ function InquiryTable({ inquiries, emptyMessage = "No inquiries match these filt
         <Link className="admin-inquiry-card" key={inquiry.id} to={`/admin/inquiries/${inquiry.id}`} aria-label={`Open inquiry from ${inquiry.name}`}>
           <span className="admin-inquiry-card-heading"><strong>{inquiry.name}</strong><StatusBadge status={inquiry.status} /></span>
           <span className="admin-inquiry-card-email">{inquiry.email}</span>
+          <span className="admin-inquiry-card-signals"><PriorityBadge priority={inquiry.priority} /><ResponseIndicator value={inquiry.firstRespondedAt} /></span>
           <span className="admin-inquiry-card-meta"><span>{inquiry.service}</span><time dateTime={inquiry.createdAt}>{formatDate(inquiry.createdAt)}</time></span>
+          <FollowUpIndicator value={inquiry.followUpAt} compact />
           <ArrowRight className="admin-inquiry-card-arrow" size={16} aria-hidden="true" />
         </Link>
       ))}
@@ -344,7 +401,7 @@ export function AdminOverviewPage() {
     setLoading(true);
     setError("");
     try {
-      const result = await adminApi.overview();
+      const result = await adminApi.overview({ today: localCalendarDate() });
       setOverview(result.data);
     } catch (requestError) {
       setError(requestError.message);
@@ -367,6 +424,28 @@ export function AdminOverviewPage() {
           <article className="admin-stat-card" key={label}><span>{label}</span>{loading ? <div className="admin-skeleton" /> : <strong>{value ?? 0}</strong>}</article>
         ))}
       </section>
+      <section className="admin-follow-up-grid" aria-label="Scheduled follow-ups">
+        {[
+          ["Due today", "dueToday", "due-today"],
+          ["Overdue", "overdue", "overdue"],
+          ["Upcoming", "upcoming", "upcoming"],
+        ].map(([label, key, filter]) => (
+          <Link className={`admin-follow-up-card admin-follow-up-card-${filter}`} key={key} to={`/admin/inquiries?followUp=${filter}`}>
+            <span>{label}</span><strong>{loading ? "—" : overview?.followUps?.[key] ?? 0}</strong><span className="admin-follow-up-card-hint">View inquiries <ArrowRight size={13} /></span>
+          </Link>
+        ))}
+      </section>
+      <section className="admin-lead-tracking-grid" aria-label="Lead priority and first response">
+        {[
+          ["High priority", "highPriority", "priority=high", "admin-lead-card-high"],
+          ["Awaiting first response", "awaitingFirstResponse", "response=awaiting", "admin-lead-card-awaiting"],
+          ["First response recorded", "firstResponseRecorded", "response=responded", "admin-lead-card-responded"],
+        ].map(([label, key, filter, className]) => (
+          <Link className={`admin-lead-card ${className}`} key={key} to={`/admin/inquiries?${filter}`}>
+            <span>{label}</span><strong>{loading ? "—" : overview?.leadTracking?.[key] ?? 0}</strong><span className="admin-follow-up-card-hint">View inquiries <ArrowRight size={13} /></span>
+          </Link>
+        ))}
+      </section>
       <div className="admin-overview-grid">
         <section className="admin-panel">
           <div className="admin-panel-heading"><div><h2>Recent inquiries</h2><p>Latest submissions from your website.</p></div><Link to="/admin/inquiries">View all <ArrowRight size={15} /></Link></div>
@@ -379,7 +458,7 @@ export function AdminOverviewPage() {
               {overview.activity.map((item) => (
                 <li key={item.id}>
                   <span className={`admin-activity-dot ${item.type}`} />
-                  <div><Link to={`/admin/inquiries/${item.inquiryId}`}>{item.inquiryName || "Inquiry"}</Link><p>{item.type === "note-added" ? "Internal note added" : `Status changed to ${statusLabel(item.status)}`}</p><time dateTime={item.createdAt}>{formatDate(item.createdAt, { dateStyle: "short", timeStyle: "short" })}</time></div>
+                  <div><Link to={`/admin/inquiries/${item.inquiryId}`}>{item.inquiryName || "Inquiry"}</Link><p>{activityLabel(item)}</p><time dateTime={item.createdAt}>{formatDate(item.createdAt, { dateStyle: "short", timeStyle: "short" })}</time></div>
                 </li>
               ))}
             </ul>
@@ -391,11 +470,15 @@ export function AdminOverviewPage() {
 }
 
 export function AdminInquiryListPage() {
+  const [searchParams] = useSearchParams();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [service, setService] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [followUp, setFollowUp] = useState(() => FOLLOW_UP_FILTERS.some((item) => item.value === searchParams.get("followUp")) ? searchParams.get("followUp") : "");
+  const [priority, setPriority] = useState(() => PRIORITIES.some((item) => item.value === searchParams.get("priority")) ? searchParams.get("priority") : "");
+  const [response, setResponse] = useState(() => RESPONSE_FILTERS.some((item) => item.value === searchParams.get("response")) ? searchParams.get("response") : "");
   const [page, setPage] = useState(1);
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
@@ -412,8 +495,14 @@ export function AdminInquiryListPage() {
       if (search.trim()) params.set("search", search.trim());
       if (status) params.set("status", status);
       if (service) params.set("service", service);
+      if (priority) params.set("priority", priority);
+      if (response) params.set("response", response);
       if (fromDate) params.set("fromDate", fromDate);
       if (toDate) params.set("toDate", toDate);
+      if (followUp) {
+        params.set("followUp", followUp);
+        if (followUp !== "none") params.set("today", localCalendarDate());
+      }
       try {
         const response = await adminApi.inquiries(params.toString(), { signal: controller.signal });
         if (active) setResult(response);
@@ -428,7 +517,7 @@ export function AdminInquiryListPage() {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [search, status, service, fromDate, toDate, page, refreshKey]);
+  }, [search, status, service, fromDate, toDate, followUp, priority, response, page, refreshKey]);
 
   function changeFilter(setter) {
     return (event) => { setter(event.target.value); setPage(1); };
@@ -443,6 +532,9 @@ export function AdminInquiryListPage() {
           <label className="admin-search-field">Search inquiries<input type="search" value={search} onChange={changeFilter(setSearch)} placeholder="Name, email, or project details" /></label>
           <label>Status<select value={status} onChange={changeFilter(setStatus)}><option value="">All statuses</option>{STATUSES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
           <label>Service<select value={service} onChange={changeFilter(setService)}><option value="">All services</option>{SERVICES.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
+          <label>Priority<select value={priority} onChange={changeFilter(setPriority)}>{PRIORITY_FILTERS.map((item) => <option key={item.value || "all"} value={item.value}>{item.label}</option>)}</select></label>
+          <label>First response<select value={response} onChange={changeFilter(setResponse)}>{RESPONSE_FILTERS.map((item) => <option key={item.value || "all"} value={item.value}>{item.label}</option>)}</select></label>
+          <label>Follow-up<select value={followUp} onChange={changeFilter(setFollowUp)}>{FOLLOW_UP_FILTERS.map((item) => <option key={item.value || "all"} value={item.value}>{item.label}</option>)}</select></label>
           <label>From date<input type="date" value={fromDate} onChange={changeFilter(setFromDate)} /></label>
           <label>To date<input type="date" min={fromDate || undefined} value={toDate} onChange={changeFilter(setToDate)} /></label>
         </div>
@@ -461,9 +553,14 @@ export function AdminInquiryDetailsPage() {
   const { id } = useParams();
   const [inquiry, setInquiry] = useState(null);
   const [status, setStatus] = useState("new");
+  const [priority, setPriority] = useState("normal");
+  const [followUpDate, setFollowUpDate] = useState("");
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [priorityBusy, setPriorityBusy] = useState(false);
+  const [responseBusy, setResponseBusy] = useState(false);
+  const [followUpBusy, setFollowUpBusy] = useState(false);
   const [error, setError] = useState("");
   const [toast, setToast] = useState(null);
   const dismissToast = useCallback(() => setToast(null), []);
@@ -475,6 +572,8 @@ export function AdminInquiryDetailsPage() {
       const result = await adminApi.inquiry(id);
       setInquiry(result.data);
       setStatus(result.data.status);
+      setPriority(result.data.priority || "normal");
+      setFollowUpDate(followUpDateInputValue(result.data.followUpAt));
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -501,6 +600,32 @@ export function AdminInquiryDetailsPage() {
     }
   }
 
+  async function savePriority() {
+    setPriorityBusy(true);
+    try {
+      await adminApi.updatePriority(id, priority);
+      setToast({ type: "success", message: "Inquiry priority updated." });
+      await load();
+    } catch (requestError) {
+      setToast({ type: "error", message: requestError.message });
+    } finally {
+      setPriorityBusy(false);
+    }
+  }
+
+  async function markResponded() {
+    setResponseBusy(true);
+    try {
+      await adminApi.markResponded(id);
+      setToast({ type: "success", message: "First response recorded." });
+      await load();
+    } catch (requestError) {
+      setToast({ type: "error", message: requestError.message });
+    } finally {
+      setResponseBusy(false);
+    }
+  }
+
   async function saveNote(event) {
     event.preventDefault();
     setBusy(true);
@@ -521,6 +646,21 @@ export function AdminInquiryDetailsPage() {
     }
   }
 
+  async function saveFollowUp(nextDate = followUpDate) {
+    setFollowUpBusy(true);
+    try {
+      const result = await adminApi.updateFollowUp(id, nextDate || null);
+      setInquiry((current) => current ? { ...current, followUpAt: result.data.followUpAt } : current);
+      setFollowUpDate(followUpDateInputValue(result.data.followUpAt));
+      setToast({ type: "success", message: nextDate ? "Follow-up date saved." : "Follow-up date cleared." });
+      await load();
+    } catch (requestError) {
+      setToast({ type: "error", message: requestError.message });
+    } finally {
+      setFollowUpBusy(false);
+    }
+  }
+
   return (
     <>
       <div className="admin-detail-back"><Link to="/admin/inquiries"><ArrowLeft size={16} /> Back to inquiries</Link></div>
@@ -528,12 +668,36 @@ export function AdminInquiryDetailsPage() {
       {error && <div className="admin-error-banner" role="alert">{error}<button type="button" onClick={load}>Retry</button></div>}
       {!loading && inquiry && <>
         <AdminPageHeading eyebrow="INQUIRY DETAILS" title={inquiry.name} description={`Received ${formatDate(inquiry.createdAt, { dateStyle: "long", timeStyle: "short" })}`} action={<StatusBadge status={inquiry.status} />} />
+        {inquiry.possibleDuplicates?.length > 0 && <section className="admin-duplicate-warning" aria-labelledby="admin-duplicate-title">
+          <div className="admin-duplicate-copy"><h2 id="admin-duplicate-title">Possible Duplicate</h2><p>One or more earlier inquiries have the same email, service, and message within 24 hours.</p></div>
+          <ul>{inquiry.possibleDuplicates.map((match) => <li key={match.id}>
+            <span><time dateTime={match.createdAt}>{formatDate(match.createdAt, { dateStyle: "medium", timeStyle: "short" })}</time><span className="admin-duplicate-status">{match.status}</span></span>
+            <Link to={`/admin/inquiries/${encodeURIComponent(match.id)}`}>Open inquiry <ArrowRight size={14} aria-hidden="true" /></Link>
+          </li>)}</ul>
+        </section>}
         <div className="admin-detail-grid">
           <section className="admin-panel admin-detail-main">
             <div className="admin-panel-heading"><div><h2>Project details</h2><p>Customer message</p></div><StatusBadge status={inquiry.status} /></div>
             <p className="admin-message">{inquiry.message}</p>
-            <div className="admin-customer-details"><div><span>Customer</span><strong>{inquiry.name}</strong></div><div><span>Email</span><a href={`mailto:${inquiry.email}`}>{inquiry.email}</a></div><div><span>Requested service</span><strong>{inquiry.service}</strong></div><div><span>Submitted</span><strong>{formatDate(inquiry.createdAt, { dateStyle: "long", timeStyle: "short" })}</strong></div></div>
+            <div className="admin-customer-details"><div><span>Customer</span><strong>{inquiry.name}</strong></div><div><span>Email</span><a href={`mailto:${inquiry.email}`}>{inquiry.email}</a></div><div><span>Requested service</span><strong>{inquiry.service}</strong></div><div><span>Submitted</span><strong>{formatDate(inquiry.createdAt, { dateStyle: "long", timeStyle: "short" })}</strong></div><div><span>Current priority</span><PriorityBadge priority={inquiry.priority} /></div></div>
             <div className="admin-status-editor"><label htmlFor="inquiry-status">Update status</label><select id="inquiry-status" value={status} onChange={(event) => setStatus(event.target.value)}>{STATUSES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select><button className="admin-button admin-button-primary" type="button" onClick={saveStatus} disabled={busy || status === inquiry.status}>Save status</button></div>
+            <div className="admin-priority-editor"><label htmlFor="inquiry-priority">Lead priority<select id="inquiry-priority" value={priority} onChange={(event) => setPriority(event.target.value)}>{PRIORITIES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label><button className="admin-button admin-button-primary" type="button" onClick={savePriority} disabled={priorityBusy || priority === (inquiry.priority || "normal")}>{priorityBusy ? "Saving…" : "Save priority"}</button></div>
+            <div className="admin-response-editor">
+              <div><strong>First response</strong>{inquiry.firstRespondedAt ? <time dateTime={inquiry.firstRespondedAt}>{formatDate(inquiry.firstRespondedAt, { dateStyle: "long", timeStyle: "short" })}</time> : <span>Awaiting first response</span>}</div>
+              <button className="admin-button admin-button-quiet" type="button" onClick={markResponded} disabled={responseBusy || Boolean(inquiry.firstRespondedAt)}>{responseBusy ? "Recording…" : inquiry.firstRespondedAt ? "Response recorded" : "Mark as Responded"}</button>
+            </div>
+            <div className="admin-follow-up-editor">
+              <div><strong>Follow-up</strong><span>{inquiry.followUpAt ? formatFollowUpDate(inquiry.followUpAt) : "No follow-up scheduled"}</span></div>
+              {inquiry.status === "completed" ? (
+                <p className="admin-follow-up-help">Reopen this inquiry before scheduling another follow-up.</p>
+              ) : (
+                <div className="admin-follow-up-controls">
+                  <label htmlFor="inquiry-follow-up-date">Follow-up date<input id="inquiry-follow-up-date" type="date" value={followUpDate} onChange={(event) => setFollowUpDate(event.target.value)} /></label>
+                  <button className="admin-button admin-button-primary" type="button" onClick={() => saveFollowUp()} disabled={followUpBusy || !followUpDate || followUpDate === followUpDateInputValue(inquiry.followUpAt)}>{followUpBusy ? "Saving…" : "Save date"}</button>
+                  {inquiry.followUpAt && <button className="admin-button admin-button-quiet" type="button" onClick={() => saveFollowUp(null)} disabled={followUpBusy}>{followUpBusy ? "Saving…" : "Clear date"}</button>}
+                </div>
+              )}
+            </div>
           </section>
           <section className="admin-panel admin-notes-panel">
             <div className="admin-panel-heading"><div><h2>Internal notes</h2><p>Visible to administrators only.</p></div></div>
@@ -541,7 +705,7 @@ export function AdminInquiryDetailsPage() {
             <form className="admin-note-form" onSubmit={saveNote}><label htmlFor="new-note">Add a note</label><textarea id="new-note" value={note} onChange={(event) => setNote(event.target.value)} maxLength={2000} rows={4} placeholder="Add a private follow-up note…" required /><button className="admin-button admin-button-primary" type="submit" disabled={busy || !note.trim()}>Add note</button></form>
           </section>
           <section className="admin-panel admin-activity-history"><div className="admin-panel-heading"><div><h2>Activity history</h2><p>Status changes and note additions.</p></div></div>
-            {inquiry.activity?.length ? <ol className="admin-history-list">{[...inquiry.activity].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map((item) => <li key={item.id}><span className="admin-activity-dot" /><div><strong>{item.type === "note-added" ? "Internal note added" : `Status changed to ${statusLabel(item.status)}`}</strong><span>{item.createdBy} · {formatDate(item.createdAt, { dateStyle: "short", timeStyle: "short" })}</span></div></li>)}</ol> : <div className="admin-empty admin-empty-compact">No admin activity recorded.</div>}
+            {inquiry.activity?.length ? <ol className="admin-history-list">{[...inquiry.activity].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map((item) => <li key={item.id}><span className="admin-activity-dot" /><div><strong>{activityLabel(item)}</strong><span>{item.createdBy} · {formatDate(item.createdAt, { dateStyle: "short", timeStyle: "short" })}</span></div></li>)}</ol> : <div className="admin-empty admin-empty-compact">No admin activity recorded.</div>}
           </section>
         </div>
       </>}

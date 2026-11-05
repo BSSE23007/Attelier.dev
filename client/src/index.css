@@ -248,11 +248,6 @@ button:focus-visible, a:focus-visible {
   font-size: 12px;
 }
 
-.footer-bottom a {
-  color: #cbd5e1;
-  text-decoration: none;
-}
-
 /* ===== FLOATING BACK-TO-TOP BUTTON ===== */
 
 .back-to-top {

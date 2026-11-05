@@ -21,6 +21,11 @@ const adminSchema = new mongoose.Schema(
       required: true,
       select: false,
     },
+    credentialVersion: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
     role: {
       type: String,
       enum: ["admin"],

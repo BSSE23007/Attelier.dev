@@ -107,9 +107,16 @@ test("rejects invalid inquiry IDs before querying MongoDB", async (t) => {
 });
 
 test("changes only status and records administrator activity", async (t) => {
-  restore(t, ["findById"]);
+  restore(t, ["findByIdAndUpdate"]);
   const inquiry = { _id: inquiryId, name: "Ada", status: "new", activity: [], save: async function () { this.updatedAt = new Date(); } };
-  Inquiry.findById = async () => inquiry;
+  let capturedUpdate;
+  Inquiry.findByIdAndUpdate = async (_id, update) => {
+    capturedUpdate = update;
+    inquiry.status = update.$set.status;
+    inquiry.activity.push(update.$push.activity);
+    inquiry.updatedAt = new Date();
+    return inquiry;
+  };
   const res = responseRecorder();
   await updateAdminInquiryStatus({ params: { id: inquiryId }, body: { status: "in-progress" }, admin: { id: adminId } }, res);
   assert.equal(res.statusCode, 200);
@@ -117,6 +124,7 @@ test("changes only status and records administrator activity", async (t) => {
   assert.equal(inquiry.status, "in-progress");
   assert.equal(inquiry.activity[0].type, "status-changed");
   assert.equal(String(inquiry.activity[0].createdBy), adminId);
+  assert.equal("followUpAt" in capturedUpdate.$set, false);
 });
 
 test("rejects invalid status values", async (t) => {
@@ -157,7 +165,7 @@ test("rejects empty internal notes", async (t) => {
 
 test("builds dashboard statistics and recent data from database results", async (t) => {
   restore(t, ["countDocuments", "find", "aggregate"]);
-  const counts = [4, 2, 1, 1];
+  const counts = [4, 2, 1, 1, 1, 2, 3, 2, 5, 1];
   Inquiry.countDocuments = async () => counts.shift();
   Inquiry.find = () => ({
     sort() { return this; }, limit() { return this; }, select() { return this; },
@@ -165,8 +173,10 @@ test("builds dashboard statistics and recent data from database results", async 
   });
   Inquiry.aggregate = async () => [{ _id: inquiryId, name: "Ada", activity: { _id: "activity-id", type: "status-changed", status: "completed", createdAt: new Date() } }];
   const res = responseRecorder();
-  await getAdminOverview({}, res);
+  await getAdminOverview({ query: { today: "2026-05-05" } }, res);
   assert.deepEqual(res.body.data.counts, { total: 4, new: 2, inProgress: 1, completed: 1 });
+  assert.deepEqual(res.body.data.followUps, { dueToday: 1, overdue: 2, upcoming: 3 });
+  assert.deepEqual(res.body.data.leadTracking, { highPriority: 2, awaitingFirstResponse: 5, firstResponseRecorded: 1 });
   assert.equal(res.body.data.recent[0].id, inquiryId);
   assert.equal(res.body.data.activity[0].status, "completed");
 });

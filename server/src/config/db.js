@@ -1,17 +1,16 @@
 
 import mongoose from "mongoose";
+import { logSafeError } from "../utils/safeErrorLogger.js";
 
 const connectDB = async () => {
   try {
-    const connection = await mongoose.connect(
+    await mongoose.connect(
       process.env.MONGODB_URI
     );
 
-    console.log(
-      `MongoDB connected: ${connection.connection.host}`
-    );
+    console.log("MongoDB connected.");
   } catch (error) {
-    console.error("MongoDB connection failed:", error.message);
+    logSafeError("MongoDB connection failed", error);
     process.exit(1);
   }
 };

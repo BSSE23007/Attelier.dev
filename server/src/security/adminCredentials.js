@@ -3,7 +3,52 @@ import { promisify } from "node:util";
 
 const scrypt = promisify(scryptCallback);
 const KEY_LENGTH = 64;
-const SCRYPT_COST = { N: 16384, r: 8, p: 1 };
+const LEGACY_SCRYPT = Object.freeze({ N: 16384, r: 8, p: 1, maxmem: 32 * 1024 * 1024 });
+const CURRENT_SCRYPT = Object.freeze({ N: 131072, r: 8, p: 1, maxmem: 256 * 1024 * 1024 });
+const HASH_PARAMETER_SETS = new Map([
+  [`${LEGACY_SCRYPT.N}:${LEGACY_SCRYPT.r}:${LEGACY_SCRYPT.p}`, LEGACY_SCRYPT],
+  [`${CURRENT_SCRYPT.N}:${CURRENT_SCRYPT.r}:${CURRENT_SCRYPT.p}`, CURRENT_SCRYPT],
+]);
+const MAX_CONCURRENT_SCRYPT_OPERATIONS = 2;
+let activeScryptOperations = 0;
+
+export class ScryptCapacityError extends Error {
+  constructor() {
+    super("Password hashing capacity is temporarily unavailable.");
+    this.name = "ScryptCapacityError";
+  }
+}
+
+async function deriveKey(password, salt, parameters) {
+  if (activeScryptOperations >= MAX_CONCURRENT_SCRYPT_OPERATIONS) {
+    throw new ScryptCapacityError();
+  }
+
+  activeScryptOperations += 1;
+  try {
+    return await scrypt(password, salt, KEY_LENGTH, parameters);
+  } finally {
+    activeScryptOperations -= 1;
+  }
+}
+
+function parsePasswordHash(storedHash) {
+  if (typeof storedHash !== "string") return null;
+
+  const [algorithm, cost, blockSize, parallelism, saltHex, keyHex, extra] = storedHash.split("$");
+  if (algorithm !== "scrypt" || extra !== undefined) return null;
+
+  const parameters = HASH_PARAMETER_SETS.get(`${cost}:${blockSize}:${parallelism}`);
+  if (!parameters || !/^[a-f0-9]{32}$/.test(saltHex || "") || !/^[a-f0-9]{128}$/.test(keyHex || "")) {
+    return null;
+  }
+
+  return {
+    parameters,
+    salt: Buffer.from(saltHex, "hex"),
+    expectedKey: Buffer.from(keyHex, "hex"),
+  };
+}
 
 export function passwordStrengthError(password) {
   if (typeof password !== "string" || password.length < 15 || password.length > 256) {
@@ -20,23 +65,22 @@ export function passwordStrengthError(password) {
 
 export async function hashPassword(password) {
   const salt = randomBytes(16);
-  const derivedKey = await scrypt(password, salt, KEY_LENGTH, SCRYPT_COST);
-  return `scrypt$${SCRYPT_COST.N}$${SCRYPT_COST.r}$${SCRYPT_COST.p}$${salt.toString("hex")}$${derivedKey.toString("hex")}`;
+  const derivedKey = await deriveKey(password, salt, CURRENT_SCRYPT);
+  return `scrypt$${CURRENT_SCRYPT.N}$${CURRENT_SCRYPT.r}$${CURRENT_SCRYPT.p}$${salt.toString("hex")}$${derivedKey.toString("hex")}`;
 }
 
 export async function verifyPassword(password, storedHash) {
-  if (typeof storedHash !== "string") return false;
-  const [algorithm, cost, blockSize, parallelism, saltHex, keyHex, extra] = storedHash.split("$");
-  if (algorithm !== "scrypt" || cost !== "16384" || blockSize !== "8" || parallelism !== "1" || !saltHex || !keyHex || extra) return false;
+  if (typeof password !== "string") return false;
+  const parsed = parsePasswordHash(storedHash);
+  if (!parsed) return false;
 
-  const salt = Buffer.from(saltHex, "hex");
-  const expectedKey = Buffer.from(keyHex, "hex");
-  if (salt.length !== 16 || salt.toString("hex") !== saltHex || expectedKey.length !== KEY_LENGTH || expectedKey.toString("hex") !== keyHex) {
-    return false;
-  }
+  const actualKey = await deriveKey(password, parsed.salt, parsed.parameters);
+  return timingSafeEqual(actualKey, parsed.expectedKey);
+}
 
-  const actualKey = await scrypt(password, salt, KEY_LENGTH, SCRYPT_COST);
-  return timingSafeEqual(actualKey, expectedKey);
+export function passwordHashNeedsRehash(storedHash) {
+  const parsed = parsePasswordHash(storedHash);
+  return Boolean(parsed && parsed.parameters.N !== CURRENT_SCRYPT.N);
 }
 
 export function createSessionToken() {

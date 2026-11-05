@@ -129,12 +129,6 @@ export default function Footer() {
           © {new Date().getFullYear()} Attelier.dev.
           All rights reserved.
         </span>
-        <a href="#top" onClick={(event) => {
-          event.preventDefault();
-          window.scrollTo({ top: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
-        }}>
-          Back to top ↑
-        </a>
       </div>
     </footer>
   );
